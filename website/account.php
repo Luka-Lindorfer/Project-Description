@@ -10,39 +10,40 @@ if(isset($_REQUEST['register'])) {
     $password2 = $_POST['password2'];
   
     if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        echo 'Bitte eine gültige E-Mail-Adresse eingeben<br>';
+        $errorMessage = 'Bitte eine gültige E-Mail-Adresse eingeben<br>';
         $error = true;
     }     
     if(strlen($password) == 0) {
-        echo 'Bitte ein password angeben<br>';
+        $errorMessage =  'Bitte ein password angeben<br>';
         $error = true;
     }
     if($password != $password2) {
-        echo 'Die Passwörter müssen übereinstimmen<br>';
+        $errorMessage =  'Die Passwörter müssen übereinstimmen<br>';
         $error = true;
     }
     
     if(!$error) { 
         $statement = $pdo->prepare("SELECT * FROM user WHERE email = :email");
-        $result = $statement->execute(array('email' => $email));
+        $result = $statement->execute(['email' => $email]);
         $user = $statement->fetch();
         
         if($user !== false) {
-            echo 'Diese E-Mail-Adresse ist bereits vergeben<br>';
+            $errorMessage =  'Diese E-Mail-Adresse ist bereits vergeben<br>';
             $error = true;
         }    
     }
     
     if(!$error) {    
-        $password_hash = password_hash($password, PASSWORD_DEFAULT);
+        $password_hash = hash("ripemd160", $password);
         
         $statement = $pdo->prepare("INSERT INTO user (username, email, password) VALUES (:username, :email, :password)");
         $result = $statement->execute(array('username' => $username, 'email' => $email, 'password' => $password_hash));
         
         if($result) {        
             $showFormular = false;
+            $errorMessage = "Erfolgreich registriert!";
         } else {
-            echo 'Beim Abspeichern ist leider ein Fehler aufgetreten<br>';
+            $errorMessage =  'Beim Abspeichern ist leider ein Fehler aufgetreten<br>';
         }
     } 
 }
@@ -51,13 +52,11 @@ if(isset($_REQUEST['login'])) {
     $email = $_POST['email'];
     $passwort = $_POST['password'];
     
-    $statement = $pdo->prepare("SELECT * FROM user WHERE email = :email");
-    $result = $statement->execute(array('email' => $email));
-    $user = $statement->fetch();
+    $statement = $pdo->prepare("SELECT * FROM user WHERE Email = :email AND Password=:pw;");
+    $result = $statement->execute(['email' => $email, ":pw" => hash("ripemd160", $passwort)]);
         
-    if ($user !== false && password_verify($passwort, $user['passwort'])) {
-        $_SESSION['userid'] = $user['id'];
-        die('Login erfolgreich. Weiter zu <a href="geheim.php">internen Bereich</a>');
+    if ($user = $statement->fetch()) {
+        $errorMessage = "Login erfolgreich!";
     } else {
         $errorMessage = "E-Mail oder Passwort war ungültig<br>";
     }
@@ -123,6 +122,11 @@ if(isset($_REQUEST['login'])) {
                             <button type="submit" class="btn" name="login">Login</button>
                         </form>
                         <form id="RegForm" method="post">
+                        <?php
+                            if (isset($errorMessage)) {
+                                echo $errorMessage;
+                            }
+                        ?>
                             <input type="text" placeholder="Username" name="username">
                             <input type="email" placeholder="Email" name="email">
                             <input type="password" placeholder="Password" name="password">
